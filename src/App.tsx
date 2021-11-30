@@ -1,8 +1,26 @@
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
+import { atom, selector, selectorFamily, useRecoilState, useRecoilValue } from 'recoil'
 import styles from './App.module.css'
 
+type UserType = {
+	name: string
+	phone: string
+}
+
+const userState = selectorFamily<UserType, number>({
+	key: 'user',
+	get:
+		(userId) =>
+		async ({ get }) => {
+			const user: UserType = await fetch(
+				`https://jsonplaceholder.typicode.com/users/${userId}`,
+			).then((res) => res.json())
+			return user
+		},
+})
+
 function App() {
-	const [choice, setChoice] = useState<number | undefined>(undefined)
+	const [userId, setUserId] = useState<number | undefined>(undefined)
 
 	return (
 		<div className={styles.container}>
@@ -11,10 +29,10 @@ function App() {
 			<div className={styles.selectWrapper}>
 				<select
 					className={styles.select}
-					value={choice}
+					value={userId}
 					onChange={(e) => {
 						const value = e.target.value
-						setChoice(value ? parseInt(value) : undefined)
+						setUserId(value ? parseInt(value) : undefined)
 					}}
 				>
 					<option>Choose a user</option>
@@ -38,8 +56,30 @@ function App() {
 					</svg>
 				</div>
 			</div>
+
+			{userId !== undefined && (
+				<Suspense fallback={<div>Loading...</div>}>
+					<UserData userId={userId} />
+				</Suspense>
+			)}
 		</div>
 	)
 }
 
 export default App
+
+const UserData = ({ userId }: { userId: number }) => {
+	const user = useRecoilValue(userState(userId))
+
+	return (
+		<div>
+			<h2>User Data:</h2>
+			<p>
+				<b>Name:</b> {user.name}
+			</p>
+			<p>
+				<b>Phone:</b> {user.phone}
+			</p>
+		</div>
+	)
+}
