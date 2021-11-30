@@ -1,23 +1,93 @@
 import { Suspense, useState } from 'react'
-import { atom, selector, selectorFamily, useRecoilState, useRecoilValue } from 'recoil'
+import {
+	atom,
+	atomFamily,
+	selector,
+	selectorFamily,
+	useRecoilState,
+	useRecoilValue,
+	useSetRecoilState,
+} from 'recoil'
 import styles from './App.module.css'
+import { getWeather } from './fakeApi'
 
 type UserType = {
 	name: string
 	phone: string
+	address: {
+		city: string
+		zipcode: string
+	}
 }
 
 const userState = selectorFamily<UserType, number>({
 	key: 'user',
+	get: (userId) => async () => {
+		const user: UserType = await fetch(
+			`https://jsonplaceholder.typicode.com/users/${userId}`,
+		).then((res) => res.json())
+		return user
+	},
+})
+
+const weatherState = selectorFamily({
+	key: 'weather',
 	get:
-		(userId) =>
+		(userId: number) =>
 		async ({ get }) => {
-			const user: UserType = await fetch(
-				`https://jsonplaceholder.typicode.com/users/${userId}`,
-			).then((res) => res.json())
-			return user
+			get(weatherRequestRefreshId(userId))
+
+			const user = get(userState(userId))
+			const weather = await getWeather(user.address.zipcode)
+			return weather
 		},
 })
+
+const weatherRequestRefreshId = atomFamily({
+	key: 'weatherRefreshId',
+	default: 0,
+})
+
+const useRefetchWeather = (userId: number) => {
+	const setRequestId = useSetRecoilState(weatherRequestRefreshId(userId))
+	return () => setRequestId((id) => id + 1)
+}
+
+const WeatherData = ({ userId }: { userId: number }) => {
+	const user = useRecoilValue(userState(userId))
+	const weather = useRecoilValue(weatherState(userId))
+	const refetch = useRefetchWeather(userId)
+
+	return (
+		<>
+			<p>
+				<b>
+					Weather for {user.address.city}: {weather}ºC
+				</b>
+			</p>
+			<p onClick={refetch}>(refresh weather)</p>
+		</>
+	)
+}
+
+const UserData = ({ userId }: { userId: number }) => {
+	const user = useRecoilValue(userState(userId))
+
+	return (
+		<div>
+			<h2>User Data:</h2>
+			<p>
+				<b>Name:</b> {user.name}
+			</p>
+			<p>
+				<b>Phone:</b> {user.phone}
+			</p>
+			<Suspense fallback={<div>Loading weather...</div>}>
+				<WeatherData userId={userId} />
+			</Suspense>
+		</div>
+	)
+}
 
 function App() {
 	const [userId, setUserId] = useState<number | undefined>(undefined)
@@ -67,19 +137,3 @@ function App() {
 }
 
 export default App
-
-const UserData = ({ userId }: { userId: number }) => {
-	const user = useRecoilValue(userState(userId))
-
-	return (
-		<div>
-			<h2>User Data:</h2>
-			<p>
-				<b>Name:</b> {user.name}
-			</p>
-			<p>
-				<b>Phone:</b> {user.phone}
-			</p>
-		</div>
-	)
-}
