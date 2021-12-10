@@ -1,13 +1,6 @@
 import { Suspense, useState } from 'react'
-import {
-	atom,
-	atomFamily,
-	selector,
-	selectorFamily,
-	useRecoilState,
-	useRecoilValue,
-	useSetRecoilState,
-} from 'recoil'
+import { ErrorBoundary, FallbackProps } from 'react-error-boundary'
+import { atomFamily, selectorFamily, useRecoilValue, useSetRecoilState } from 'recoil'
 import styles from './App.module.css'
 import { getWeather } from './fakeApi'
 
@@ -26,6 +19,7 @@ const userState = selectorFamily<UserType, number>({
 		const user: UserType = await fetch(
 			`https://jsonplaceholder.typicode.com/users/${userId}`,
 		).then((res) => res.json())
+		if (userId === 4) throw new Error('User does not exist')
 		return user
 	},
 })
@@ -65,7 +59,14 @@ const WeatherData = ({ userId }: { userId: number }) => {
 					Weather for {user.address.city}: {weather}ºC
 				</b>
 			</p>
-			<p onClick={refetch}>(refresh weather)</p>
+			<p
+				style={{
+					cursor: 'pointer',
+				}}
+				onClick={refetch}
+			>
+				(refresh weather)
+			</p>
 		</>
 	)
 }
@@ -85,6 +86,18 @@ const UserData = ({ userId }: { userId: number }) => {
 			<Suspense fallback={<div>Loading weather...</div>}>
 				<WeatherData userId={userId} />
 			</Suspense>
+		</div>
+	)
+}
+
+const ErrorFallback = ({ error, resetErrorBoundary }: FallbackProps) => {
+	return (
+		<div>
+			<h2>Something went wrong!</h2>
+			<p>{error.message}</p>
+			<button className={styles.btn} onClick={resetErrorBoundary}>
+				Ok
+			</button>
 		</div>
 	)
 }
@@ -128,9 +141,17 @@ function App() {
 			</div>
 
 			{userId !== undefined && (
-				<Suspense fallback={<div>Loading...</div>}>
-					<UserData userId={userId} />
-				</Suspense>
+				<ErrorBoundary
+					FallbackComponent={ErrorFallback}
+					onReset={() => {
+						setUserId(undefined)
+					}}
+					resetKeys={[userId]}
+				>
+					<Suspense fallback={<div>Loading...</div>}>
+						<UserData userId={userId} />
+					</Suspense>
+				</ErrorBoundary>
 			)}
 		</div>
 	)
