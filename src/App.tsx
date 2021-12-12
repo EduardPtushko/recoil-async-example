@@ -16,9 +16,8 @@ type UserType = {
 const userState = selectorFamily<UserType, number>({
 	key: 'user',
 	get: (userId) => async () => {
-		const user: UserType = await fetch(
-			`https://jsonplaceholder.typicode.com/users/${userId}`,
-		).then((res) => res.json())
+		const res = await fetch(`https://jsonplaceholder.typicode.com/users/${userId}`)
+		const user: UserType = await res.json()
 		if (userId === 4) throw new Error('User does not exist')
 		return user
 	},
